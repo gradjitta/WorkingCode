@@ -1,0 +1,281 @@
+```{r}
+extractIHMMData <- function(temp.data, grids) {
+  # return feat, movement, grids
+  temp.vec <- c()
+  M <- length(temp.data$x)
+  new.t <- temp.data$gaps
+  lost.t <- rep(0, M)
+  for ( i in 2:length(grids)) {
+    if(grids[i-1] != grids[i]) {
+      temp.vec <-c(temp.vec, i-1)
+      xcoords <- temp.data$x[temp.vec]
+      ycoords <- temp.data$y[temp.vec]
+      next.x <- temp.data$x[i]
+      next.y <- temp.data$y[i]
+      tlag <- temp.data$gaps[i]
+      # box [lx, rx, uy, dy]
+      box1 <- getBoundingBox(grids[i-1])
+      box2 <- getBoundingBox(grids[i])
+      new.coords1 <- createCoords(xcoords, ycoords, grids, i, temp_vec, temp.data, box1)
+      coords.box1 <- getIntersection(xcoords[i-1], ycoords[i-1], box1, next.x, next.y)
+      coords.box2 <- getIntersection(xcoords[i-1], ycoords[i-1], box2, next.x, next.y)
+      temp.feat  <- sumsVec(new.coords1$x, new.coords1$y)
+      del.t <- splitTime(c(xcoords[i-1], ycoords[i-1]), coords.box1, coords.box2, c(next.x, next.y), tlag)
+      new.t[i-1] <- new.t[i-1] + del.t[1]
+      lost.t[i] <- del.t[2]
+      new.t[i]  <- del.t[3]
+      tot.time <- sum(new.t[temp.vec])
+      temp.emit[[i-1]] <- c(tot.time, temp.feat)
+      temp.vec <-c()
+      } else {
+        temp.vec <-c(temp.vec, i-1)
+      }
+    if ( i == length(grids)) {
+      temp.vec <-c(temp.vec, i)
+      xcoords <- temp.data$x[temp.vec]
+      ycoords <- temp.data$y[temp.vec]
+      box1 <- getBoundingBox(grids[i])
+      new.coords1 <- createCoords(xcoords, ycoords, grids, i, temp_vec, temp.data, box1)
+      temp.feat  <- sumsVec(new.coords1$x, new.coords1$y)
+      tot.time <- sum(new.t[temp.vec])
+      temp.emit[[i]] <- c(tot.time, temp.feat)
+      temp.vec <-c()
+    }
+    ret.data <- list()
+    ret.data$emit <- temp.emit
+    ret.data$dt <- lost.t
+    ret.data$grids <- grids
+    }
+  }
+```
+
+```{r}
+      move.diff <- temp.data$states[, i] - temp.data$states[, i-1]
+      flag <- sum((move.diff <= -2)) + sum((move.diff >= 2))
+      if(flag == 0) {
+        del.t <- splitTime(new.coords,temp.vec)
+        del.t[1] + sum(temp.data$gaps[temp.vec[2:end]])
+        if(sum(move.diff == 0)) {
+          # local diag movements
+        } else {
+          # local normal movements
+        }
+      } else {
+        # Fast movements/ Jumps within the grids
+      }
+```
+
+```{r}
+getIhmmData <- function(hmmdata) {
+  # Test
+  test <- hmmdata[[1]]
+  grids <- sapply(1:dim(test$states)[2],function(i) (test$states[2, i] - 1)*26 + test$states[1, i])
+  path1 <- extractIHMMData(test, grids)
+  path1 
+}
+#paths[[p.count]]$sample <- data.ihmm$sample
+#paths[[p.count]]$grid <- data.ihmm$grid
+#paths[[p.count]]$states <- data.ihmm$states
+#paths[[p.count]]$pstates <- data.ihmm$pstates
+```
+
+
+```{r}
+splitTime <- function(c1, b1, b2, c2, tlag){
+  d1 <- sqrt((c1[2] - b1[2])^2 + (c1[1] - b1[1])^2)
+  d2 <- sqrt((c2[2] - b2[2])^2 + (c2[1] - b2[1])^2)
+  dtot <- sqrt((c2[2] - c1[2])^2 + (c2[1] - c1[1])^2)
+  v <- c((d1/dtot), (0.0001+dtot-(d1+d2))/dtot, (d2/dtot))
+  ret.val <- v*tlag
+  return (ret.val)
+}
+```
+
+
+```{r}
+sumsVec <- function(xcoords, ycoords) {
+  p_xsum <- 0.000001
+  p_ysum <- 0.000001
+  n_ysum <- 0.000001
+  n_xsum <- 0.000001
+  for (i in 2:length(xcoords)) {
+    dx <- xcoords[i] - xcoords[i-1]
+    dy <- ycoords[i] - ycoords[i-1]
+    if ((xcoords[i] - xcoords[i-1]) > 0) {
+      p_xsum <- p_xsum + dx
+    } else {
+      n_xsum <- n_xsum + (-1*dx)
+    }
+    if ((ycoords[i] - ycoords[i-1]) > 0) {
+      p_ysum <- p_ysum + dy
+    } else {
+      n_ysum <- n_ysum + (-1*dy)
+    }
+  }
+  res <- c(p_xsum, n_xsum, p_ysum, n_ysum)
+  return(res)
+}
+```
+
+
+
+```{r}
+getNewDiag  <- function(temp.data, i, box, m, coords, states) {
+  # function the generates nearest grid block to use
+  N  <- length(coords)
+  if((m[1] == -1)&& (m[2] == 1)) {
+    if(box[4] < coords$y[N]) {
+      new.state <- states + c(-1, 0)
+    } else {
+      new.state <- states + c(0, 1)
+    }
+  } else if((m[1] == 1)&& (m[2] == 1)) {
+    if(box[4] < coords$y[N]) {
+      new.state <- states + c(1, 0)
+    } else {
+      new.state <- states + c(0, 1)
+    }
+  } else if((m[1] == -1)&& (m[2] == -1)) {
+    if(box[3] > coords$y[N]) {
+      new.state <- states + c(-1, 0)
+    } else {
+      new.state <- states + c(0, -1)
+    }
+  } else if((m[1] == 1)&& (m[2] == -1)) {
+    if(box[3] > coords$y[N]) {
+      new.state <- states + c(1, 0)
+    } else {
+      new.state <- states + c(0, -1)
+    }
+  }
+  return(new.state)
+}
+```
+
+
+```{r}
+getIntersection <- function(x, y, box, x0, y0) {
+  # gets intersection with the box and the points x,y and x0,y0
+  if ((x0 - x) == 0) {
+    x0 <- x0 + 0.01
+  }
+  if ((y0 - y) == 0) {
+    y0 <- y0 + 0.01
+  }
+  slope <- (y0 - y) / (x0 - x)
+  temp <- list()
+  final <- c(0,0)
+  for (j in 1:length(box)) {
+    if (j < 3) {
+      temp <- slope*box[j] + (y0 - slope*x0)
+      d1 = sqrt((y0 - temp)^2 + (x0 - box[j])^2)
+      d2 = sqrt((y - temp)^2 + (x - box[j])^2)
+      d3 = sqrt((y0 - y)^2 + (x0 - x)^2)
+      if ( ((d1+d2) - d3 < 0.001) && (box[3] >= temp) && (box[4] <= temp)) {
+        final[1] <- box[j]
+        final[2] <- temp
+      }
+    } else {
+      temp <- (1/slope) * ( box[j] - (y0 - slope*x0) )
+      d1 = sqrt((y0 - box[j])^2 + (x0 - temp)^2)
+      d2 = sqrt((y - box[j])^2 + (x - temp)^2)
+      d3 = sqrt((y0 - y)^2 + (x0 - x)^2)
+      if ( ((d1+d2) - d3 < 0.001) && (box[1] <= temp) && (box[2] >= temp) ) {
+        final[1] <- temp
+        final[2] <- box[j]
+      }
+    }
+  }
+  return (final)
+}
+```
+
+
+
+```{r}
+getBoundingBox <- function(G) {
+  if ((G %% 26) > 0) {
+    rx <- (G %% 26) * 4.0
+    lx <- ((G %% 26) - 1) * 4.0
+    uy <- -4.0 * (floor(G / 26)) 
+    dy <- -4.0 * (ceiling(G / 26 ))
+    box <- c(lx, rx, uy, dy)
+    } else {
+      rx <- 26 * 4.0
+      lx <- 25 * 4.0
+      uy <- -4.0 * ((G / 26) - 1) 
+      dy <- -4.0 * ((G / 26))
+      box <- c(lx, rx, uy, dy)
+      }
+  box
+  }
+```
+
+```{r}
+createCoords <- function(xcoords, ycoords, grids, i, temp_vec, temp.data, box) {
+  # xcoords, ycoords, grids, i, temp_vec, temp.data
+  # box : lx, rx, uy, dy
+  # initialize output
+  N <- length(xcoords)
+  M <- length(temp.data$gaps)
+  pcoords <- c()
+  ncoords <- c()
+  if(N == 1) {
+    xnext <- temp.data$x[i]
+    ynext <- temp.data$y[i]
+    ncoords <- getIntersection(xnext, ynext, box, xcoords, ycoords) 
+    if( (i-1) == 1) {
+      pcoords[1] <- xcoords + 0.001
+      pcoords[2] <- box[3]
+    } else {
+      xprev <- temp.data$x[i-2]
+      yprev <- temp.data$y[i-2]
+      pcoords <- getIntersection(xprev, yprev, box, xcoords, ycoords) 
+    }
+    ret.xcoords <- c(pcoords[1], xcoords, ncoords[1])
+    ret.ycoords <- c(pcoords[2], ycoords, ncoords[2])
+  } else {
+    if (i == M) {
+      xnext <- temp.data$x[M] + 0.001
+      ynext <- box[3]
+    } else {
+      xnext <- temp.data$x[i]
+      ynext <- temp.data$y[i]
+    }
+    ncoords <- getIntersection(xnext, ynext, box, xcoords[N], ycoords[N])
+    xprev <- temp.data$x[temp_vec[1]-1]
+    yprev <- temp.data$y[temp_vec[1]-1]
+    if( temp_vec[1] == 1) {
+      pcoords[1] <- xcoords[1] + 0.001
+      pcoords[2] <- box[3]
+    } else {
+      pcoords <- getIntersection(xprev, yprev, box, xcoords[1], ycoords[1])
+    }
+    ret.xcoords <- c(pcoords[1], xcoords, ncoords[1])
+    ret.ycoords <- c(pcoords[2], ycoords, ncoords[2])
+  }
+  res <- list()
+  res$x <- ret.xcoords
+  res$y <- ret.ycoords
+  return(res)
+}
+```
+
+
+
+```{r}
+getIhmmData <- function(data) {
+  # hmmdata
+  for (i in 1:length(data)) {
+    temp.states <- hmmdata[[i]]$states
+    temp.data <- hmmdata[[i]]
+    grids <- sapply(1:dim(temp.states)[2], function(i) (temp.states[2, i] - 1)*26 + temp.states[1, i])
+    new.data <- increaseData(temp.data, grids)
+  }
+}
+#paths[[p.count]]$sample <- data.ihmm$sample
+#paths[[p.count]]$grid <- data.ihmm$grid
+#paths[[p.count]]$states <- data.ihmm$states
+#paths[[p.count]]$pstates <- data.ihmm$pstates
+```
+

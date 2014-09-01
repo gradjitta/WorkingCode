@@ -1,0 +1,172 @@
+Helper Functions
+========================================================
+
+
+```{r}
+getTrans <- function(g, tcounts1, tcounts2, tcountsg, L, Ck, lpi, lookup) {
+  #getTrans(paths[[i]]$grids, tcounts1, tcounts2, tcountsg,
+  #                             L[[i]], sample.hdp$CK, sample.hdp$lpi, lookup)
+  N <- length(g)
+  tr.probs <- rep(0,(N-1))
+  transMat <- lapply(1:(N-1), function(i) NULL)
+  u <- rep(0, N-1)
+  for(j in 2:N) {
+    gn <- g[j]
+    ln <- L[j]
+    lc <- L[j-1]
+    gc <- g[j-1]
+    if (sum(which(lookup == gn)) == 0) {
+      tempn2 <- 1
+    } else {
+      tempn2 <- Ck[[which(lookup == gn)]]
+    }
+    if (sum(which(lookup == gc)) == 0) {
+      tempnc <- 1
+    } else {
+      tempnc <- Ck[[which(lookup == gc)]]
+    }
+    t2 <- length(tempn2)
+    t1 <- length(tempnc)
+    if( any(getNbGrids(gc) == gn) ) {
+      t1.pmat <- matrix(0, ncol=t2, nrow=t1)
+      t2.pmat <- matrix(0, ncol=length(getNbGrids(gc)), nrow=t1)
+      gk <- which(getNbGrids(gc) == gn)
+      for(k in 1:t1) {
+        t1.pmat[k, ] <- SampleDirichlet(tcounts1[[gc]][[gk]][k, ] + 1)
+        t2.pmat[k, ] <- SampleDirichlet(tcounts2[[gc]][k, ] + 1)
+      }
+      gk <- which(getNbGrids(gc) == gn)
+      tr.probs[j-1] <- t1.pmat[lc, ln] * t2.pmat[lc, gk]
+      temp.mat <- matrix(0, ncol=t2, nrow= t1)
+      for(kk in 1:t2) {
+        temp.mat[ , kk] <- t1.pmat[, kk] * t2.pmat[, gk]
+      }
+      transMat[[j-1]] <- temp.mat
+    } else {
+      tr.probsg <- SampleDirichlet(tcountsg[gc, ] + 1)
+      sv <- which(lookup == gn)
+      tr.probs[j-1] <- tr.probsg[gn] * lpi[[sv]][ln]
+      temp.mat <- matrix(0, ncol=t2, nrow= t1)
+      for(kk in 1:t2) {
+        temp.mat[ , kk] <- rep((tr.probsg[gn] * lpi[[sv]][kk]) , t1)
+      }
+      transMat[[j-1]] <- temp.mat
+    }
+    u[j-1] <- runif(1, 0, tr.probs[j-1])
+  }
+  ret <- list()
+  ret$trans <- tr.probs
+  ret$transMat <- transMat
+  ret$u <- u
+  return(ret)
+}
+```
+
+```{r}
+#emit is a list=================================================
+getEmit <- function(emit, g, L, Ck, phi, lookup) {
+  # getEmit(paths[[i]]$emit, paths[[i]]$grids, L[[i]],
+  #                         sample.hdp$CK, sample.hdp$phi, lookup)
+  N0 <- length(g)
+  N <- dim(phi)[2] / 2
+  emit.probs <- rep(0, N0)
+  for (i in 1:N0) {
+    if (sum(which(lookup == g[i])) == 0) {
+      m <- 1 # Choose beta.k max?
+    } else {
+      gi <- which(lookup == g[i])
+      m <- Ck[[gi]][L[i]]
+    }
+    pd <- 1
+    for (feat in 1:N) {
+      pd <- pd * dnorm(emit[[i]][feat], phi[m, feat], sqrt(phi[m,N+feat]))
+      # underflow
+    }
+    emit.probs[i] <- pd
+  }
+  return(emit.probs)
+}
+```
+
+```{r}
+alphaInit <- function(paths, L, Ck, lookup, phi) {
+  emit <- paths$emit
+  Np <- length(paths$grids)
+  N0 <- dim(phi)[2] / 2
+  n1 <- which(paths$grids[[1]] == lookup)
+  N <- length(Ck[[n1]])
+  alpha <- lapply(1:N, function(i) NULL)
+  alpha[[1]] <- rep(1, N)
+  for (k in 1:N) {
+    if (sum(n1) == 0) {
+      m <- 1
+    } else {
+      m <- Ck[[n1]][1]
+    }
+    pd <- 1
+    for (feat in 1:N0) {
+      pd <- pd * dnorm(emit[[k]][feat], phi[m, feat], sqrt(phi[m,N0+feat]))
+    }
+    alpha[[1]][k] <- pd
+  }
+  for (i in 2:Np) {
+    nc <- which(paths$grids[[i]] == lookup)
+    if (sum(nc) == 0) {
+      alpha[[i]] <- rep(0, 1)
+    } else {
+      alpha[[i]] <- rep(0, length(Ck[[nc]]))
+    }
+  }
+  return(alpha)
+}
+```
+
+```{r}
+dataForHdp <- function(paths, initL, sample.run1000, hdp.data) {
+  Ck <- sample.run1000$CK
+  lookup <- sapply(hdp.data[[2]], function(i) i)
+  N <- length(paths)
+  data <- list()
+  Lhdp <- list()
+  d <- list()
+  for (ini in 1:520) {
+    data[[ini]] <- matrix(1:5, 1, 5)
+    Lhdp[[ini]] <- c()
+    d[[ini]] <- c()
+  }
+  for(i in 1:N) {
+    for(j in 1:length(paths[[i]]$grids)) {
+      nk <- which(paths[[i]]$grids[j] == lookup)
+      data[[paths[[i]]$grids[j]]] <- rbind(data[[paths[[i]]$grids[j]]],
+                                           paths[[i]]$emit[[j]])
+      Lhdp[[paths[[i]]$grids[j]]]  <- c(Lhdp[[paths[[i]]$grids[j]]],
+                                     L[[i]][j])
+      d[[paths[[i]]$grids[j]]]  <- c(d[[paths[[i]]$grids[j]]],
+                                     Ck[[nk]][L[[i]][j]])
+    }
+  }
+  ret <- list()
+  ret$d <- d
+  ret$Lhdp <- Lhdp
+  ret$data <- data
+}
+```
+
+
+
+```{r}
+betaInit <- function(paths, L, Ck, lookup) {
+  N <- length(paths$grids)
+  n1 <- which(paths$grids[[1]] == lookup)
+  alpha[[1]] <- rep(1, length(Ck[[n1]]))
+  alpha[[1]] <- alpha[[1]] /sum(alpha[[1]])
+  alpha <- list()
+  for (i in 2:N) {
+    nc <- which(paths$grids[[i]] == lookup)
+    alpha[[i]] <- rep(0, length(Ck[[nc]]))
+  }
+  return(beta)
+}
+```
+
+
