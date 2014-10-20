@@ -1,19 +1,14 @@
-predHMMdt <- function(sample, timeahead, pathid, startpos, startcount, ptrans) {
+predHMMdt <- function(sample, stepsahead, pathid, startpos, startcount, ptrans) {
  source("alphaInitgc.R")
  source("getTransgnp.R")
- source("simpleModel.R")
+ #source("simpleModel.R")
+ source("getEmitg.R")
  source("getDist.R")
  source("getBoundingBox.R")
- library("gtools")
- library("Matrix")
  resinit <- sample
  idp <- pathid
- dt <- timeahead
- pos <- startpos
- paths1 <- readRDS("newData/lpathsb.rds")
- baskets <- readRDS("newData/basketsn.rds")
- lookup1 <- baskets$lookup1
- gridlist <- baskets$gridlist
+ dt <- stepsahead
+ pos <- startpos# resinit <- readRDS("../../../results/resultsalpha3g100.rds")
  Jumps <-  rowSums(resinit$counts[[3]])
  nonJumps <- sapply(1:520, function(i) sum(colSums(resinit$counts[[2]][[i]])))
  jumpProbs <- mapply(function(i,j) rbeta(1,1+i,1+j), Jumps, nonJumps)
@@ -35,7 +30,7 @@ predHMMdt <- function(sample, timeahead, pathid, startpos, startcount, ptrans) {
  alphas <- alphaInitgc(paths1[[idp]], L[[idp]], lookup1, resinit$phi, resinit$K)
  #startcount <- sapply(1:520, function(i) sum(sapply(1:length(paths1), function(j) paths1[[j]]$grids[1] == i)))
  alpha0 <- startcount / sum(startcount)
- alphatemp <- alpha0[paths[[idp]]$grids[1]] * resinit$lw[paths[[idp]]$grids[1], ]
+ alphatemp <- alpha0[paths1[[idp]]$grids[1]] * resinit$lw[paths1[[idp]]$grids[1], ]
  alpha0 <- alphatemp / sum(alphatemp)
  getAlphas <- function(trans.path, emit.path, grids, u, T0) {
      for (t in 2:T0) {
@@ -94,24 +89,71 @@ predHMMdt <- function(sample, timeahead, pathid, startpos, startcount, ptrans) {
      retval$g <- gn[gi]
      retval$l <- gl
      retval$alphas <- alpha0
-     print("nj")
+     #print("nj")
    } else {
      print("j")
      retval <- list()
-     jumpmat <- getJumpMat(gt, ptrans[[3]], lw, phi, alphas)
-     jumpvec <- as.vector(jumpmat)
-     jprobs <- jumpvec / sum(jumpvec)
-     sampleind <- sample(1:length(jprobs), 1,  prob = jprobs)
+     #jumpmat <- getJumpMat(gt, ptrans[[3]], lw, phi, alphas)
+     #jumpvec <- as.vector(jumpmat)
+     #jprobs <- jumpvec / sum(jumpvec)
+     #sampleind <- sample(1:length(jprobs), 1,  prob = jprobs)
+     lnext <- sample(1:length(lw[gt, ]), 1, prob = lw[gt, ])
+     jprobs <- ptrans[[3]][gt, ] * lw[gt, lnext]
+     gnext <- sample(1:length(jprobs), 1,  prob = jprobs)
      #sampleind <-  1 + sum(runif(length(jprobs), 0, 1) > cumsum(jprobs))
-     nextVs <- getIndMat(sampleind, length(jumpvec), Ln, 520)
-     gnext <- nextVs[2]
-     lnext <- nextVs[1]
+     #nextVs <- getIndMat(sampleind, length(jumpvec), Ln, 520)
+     #gnext <- nextVs[2]
+     #lnext <- nextVs[1]
      retval$g <- gnext
      retval$l <- lnext
-     tempemit <- rnorm(5,phi[lnext,1:5], phi[lnext,6:10])
-     emits <- tempEmit(K, tempemit, phi)
-     emits <- 1
-     retval$alphas <- jumpmat[, gnext] / sum(jumpmat[, gnext])
+     #empemit <- rnorm(5,phi[lnext,1:5], phi[lnext,6:10])
+     #mits <- tempEmit(K, tempemit, phi)
+     #mits <- 1
+     #etval$alphas <- jumpmat[, gnext] / sum(jumpmat[, gnext])
+     retval$alphas <- ptrans[[3]][gt, gnext] * lw[gt, ] / sum(ptrans[[3]][gt, gnext] * lw[gt, ])
+  }
+   return (retval)
+}
+predNextii<- function(ptrans,phi, alphas, gt,lt, lookup1,K, lw,t,dt, flag) {
+   print(gt)
+   print(lt)
+   gn <- getNbGrids(gt)
+   Ln <- K
+   if (flag == 0) {
+     retval <- list()
+     sampg <- ptrans[[2]][[gt]][lt, ]
+     sampg <- sampg / sum(sampg)
+     gi <- sample(1:length(sampg),1,prob = sampg)
+     # gi <- 1 + sum(runif(length(sampg), 0, 1) > cumsum(sampg))
+     sampl <- colSums((ptrans[[1]][[gt]][[gi]] * (ptrans[[2]][[gt]][, gi] * alphas) ))
+     alpha0 <- sampl / sum(sampl)
+     gl <- sample(1:length(alpha0),1,prob = alpha0)
+     #gl <- 1 + sum(runif(length(alpha0), 0, 1) > cumsum(alpha0))
+     retval$g <- gn[gi]
+     retval$l <- gl
+     retval$alphas <- alpha0
+     #print("nj")
+   } else {
+     print("j")
+     retval <- list()
+     #jumpmat <- getJumpMat(gt, ptrans[[3]], lw, phi, alphas)
+     #jumpvec <- as.vector(jumpmat)
+     #jprobs <- jumpvec / sum(jumpvec)
+     #sampleind <- sample(1:length(jprobs), 1,  prob = jprobs)
+     lnext <- sample(1:length(lw[gt, ]), 1, prob = lw[gt, ])
+     jprobs <- ptrans[[3]][gt, ] * lw[gt, lnext]
+     gnext <- sample(1:length(jprobs), 1,  prob = jprobs)
+     #sampleind <-  1 + sum(runif(length(jprobs), 0, 1) > cumsum(jprobs))
+     #nextVs <- getIndMat(sampleind, length(jumpvec), Ln, 520)
+     #gnext <- nextVs[2]
+     #lnext <- nextVs[1]
+     retval$g <- gnext
+     retval$l <- lnext
+     #empemit <- rnorm(5,phi[lnext,1:5], phi[lnext,6:10])
+     #mits <- tempEmit(K, tempemit, phi)
+     #mits <- 1
+     #etval$alphas <- jumpmat[, gnext] / sum(jumpmat[, gnext])
+     retval$alphas <- ptrans[[3]][gt, gnext] * lw[gt, ] / sum(ptrans[[3]][gt, gnext] * lw[gt, ])
   }
    return (retval)
 }
@@ -177,33 +219,35 @@ predHMMdt <- function(sample, timeahead, pathid, startpos, startcount, ptrans) {
    lall <- c()
    while(temp < dt) {
      flag <- rbinom(1,size=1,prob = jumpProbs[gt])
-     retvals <- predNexti(ptrans,phi, alphas, gt,lt, lookup1,K, lw,t,dt,flag)
+     retvals <- predNextii(ptrans,phi, alphas, gt,lt, lookup1,K, lw,t,dt,flag)
      gt <- retvals$g
+     if( sum(which(c(1,26,495,520) == gt)) > 0 ) {
+       gt <- 2
+     }
      gall <- c(gall, gt)
      lt <- retvals$l
      lall <- c(lall, lt)
      alphas <- retvals$alphas
      #temp <- temp + resinit$phi[lt, ][1]
-     tsample <- rnorm(1, resinit$phi[lt, ][1],resinit$phi[lt, ][6])
-     temp <- temp + exp(tsample)
+     #sample <- rnorm(1, resinit$phi[lt, ][1],resinit$phi[lt, ][6])
+     temp <- temp + 1
      #print(exp(tsample))
    }
    print("pred grid states")
    print(paste(gall))
    print("pred local states")
    print(paste( lall))
-   print(paste("true states ",dt,"seconds ahead"))
-   indx <- (pos):length(paths1[[idp]]$grids)
-   tidx <- which(cumsum(exp(sapply(1:length(indx), function(i) paths1[[idp]]$emit[[indx[i]]][1]))) < dt)
-   print(paste(paths1[[idp]]$grids[tidx+pos]))
-   print(resinit$L[[idp]][tidx + pos])
-   gtr <- paths1[[idp]]$grids[tidx+pos]
-   ret <- c(gall[length(gall)], gtr[length(gtr)], length(gall))
+   print(paste("true states ",dt,"steps ahead"))
+   #indx <- (pos):length(paths1[[idp]]$grids)
+   #tidx <- which(cumsum(exp(sapply(1:length(indx), function(i) paths1[[idp]]$emit[[indx[i]]][1]))) < dt)
+   print(paste(paths1[[idp]]$grids[(pos+1):(pos+dt)]))
+   gtr <- paths1[[idp]]$grids[pos + dt]
+   ret <- c(gall[length(gall)], gtr, length(gall))
    ret
  }
  gret1 <- predictDt(dt, ptrans, alphas[[pos]], paths1[[idp]]$grids[pos],resinit$L[[idp]][pos] , lookup1,resinit$K, resinit$lw, pos, resinit$phi)
  print("Simple model")
- gret2 <- simpleModel(resinit, dt, pos, idp, gret1[3])
+ gret2 <- simpleModel(520, resinit, dt, pos, idp)
  dists <-  getDist(gret1[1], gret2, gret1[2])
  print(dists)
 }
