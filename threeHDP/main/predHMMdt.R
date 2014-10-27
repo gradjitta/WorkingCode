@@ -2,10 +2,11 @@ predHMMdt <- function(sample, stepsahead, pathid, startpos, startcount, ptrans) 
  source("alphaInitgc.R")
  source("getTransgnp.R")
  #source("simpleModel.R")
- source("getEmitg.R")
+ source("getEmitgt.R")
  source("getDist.R")
  source("getBoundingBox.R")
  resinit <- sample
+ N1 <- ncol(resinit$phi) / 2
  idp <- pathid
  dt <- stepsahead
  pos <- startpos# resinit <- readRDS("../../../results/resultsalpha3g100.rds")
@@ -21,7 +22,7 @@ predHMMdt <- function(sample, stepsahead, pathid, startpos, startcount, ptrans) 
  L <- resinit$L
  trans.list <- getTransgnp(paths1[[idp]]$grids, resinit$probs[[1]], resinit$probs[[2]], resinit$probs[[3]], L[[idp]], resinit$K-1, resinit$lw, lookup1, resinit$K, alphaTrans)
  trans.path <- trans.list$transMat
- emit.path <- getEmitg(resinit$K, paths1[[idp]]$emit, paths1[[idp]]$grids, resinit$phi, lookup1)
+ emit.path <- getEmitgt(resinit$K, paths1[[idp]]$emit, paths1[[idp]]$grids, resinit$phi, lookup1, N1)
  L <- resinit$L
  u <- trans.list$u
  #alphacounts <- sapply(1:resinit$K, function(j) sum( sapply(1:length(L), function(i) L[[i]][1]) == j))
