@@ -1,4 +1,5 @@
 getBoundingBox <- function(G) {
+# getBoundingBoxc.R is used in the main code, Ignore this function
   if ((G %% 26) > 0) {
     rx <- (G %% 26) * 4.0
     lx <- ((G %% 26) - 1) * 4.0
