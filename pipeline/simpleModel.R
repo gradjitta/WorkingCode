@@ -1,22 +1,16 @@
 simpleModel <- function(M, sample1, timeahead, startpos, pathid, steps, cSize, Lmin, Bmin) {
   library("gtools")
   library("Matrix")
-  #paths1 <- readRDS("newData/lpathsb.rds")
-  #baskets <- readRDS("newData/basketsn.rds")
-  #lookup1 <- baskets$lookup1
-  #gridlist <- baskets$gridlist
   utcounts <- sample1$counts
   predictDts <- function(dt, jumpcounts, Ntcounts) {
    posi <- pos
    temp <- 0
    gall <- c()
    while(temp < steps) {
-#     print(gt)
      flag <- rbinom(1,size=1,prob = jumpProbs[gt])
      gt <- predNexts(gt, flag, Ntcounts, jumpcounts)
      gall <- c(gall, gt)
      temp <- temp + 1
-     #print(exp(tsample))
    }
    indx <- (pos):length(paths1[[idp]]$grids)
   # tidx <- which(cumsum(exp(sapply(1:length(indx), function(i) paths1[[idp]]$emit[[indx[i]]][1]))) < dt)
@@ -30,7 +24,6 @@ simpleModel <- function(M, sample1, timeahead, startpos, pathid, steps, cSize, L
  }
  predNexts <- function(gt, flag, Ntcounts, jumpcounts) {
    if (flag == 0) {
-     
      nextgi <- sample(1:length(Ntcounts[[gt]]), size = 1, prob = rdirichlet(1, Ntcounts[[gt]]+1 ))
      gn <- getNbGridsF(gt, cSize, Lmin, Bmin)[nextgi]
    } else {
