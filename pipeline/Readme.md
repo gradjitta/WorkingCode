@@ -7,5 +7,6 @@
 
 #### 2. Prediction on Test set
  resultsScriptnTest.R runs the following scripts
-  * predHMMTest.R (main prediction code) 
+  * predHMMTest.R (main prediction code, for local model).
+  * simpleModel.R (first order Markov Model).
   
