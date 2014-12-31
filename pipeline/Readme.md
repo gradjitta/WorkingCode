@@ -6,6 +6,6 @@
  runThreeHDPgen.R takes care of the training.
 
 #### 2. Prediction on Test set
- resultsScriptTest.R runs the following scripts
+ resultsScriptnTest.R runs the following scripts
   * predHMMTest.R (main prediction code) 
   
